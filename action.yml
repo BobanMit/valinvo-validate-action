@@ -1,0 +1,54 @@
+name: "Valinvo e-invoice validator (XRechnung, ZUGFeRD, Peppol)"
+description: "Validate XRechnung, ZUGFeRD/Factur-X and Peppol BIS e-invoices (XML or PDF) against the official rules."
+author: "BMK HUB"
+branding:
+  icon: "check-circle"
+  color: "green"
+
+inputs:
+  files:
+    description: "Glob patterns of the invoice files to validate (XML, or ZUGFeRD / Factur-X PDF), one per line or comma-separated, e.g. 'tests/invoices/**/*.xml'."
+    required: true
+  accept-terms:
+    description: "Without an API key: the version of the Valinvo Terms of Use you accept (currently '1.0', see https://valinvo.bmk-hub.com/terms). Use sample or test invoices only."
+    required: false
+    default: ""
+  api-key:
+    description: "Optional Valinvo API key (pass it as a secret). Replaces 'accept-terms'."
+    required: false
+    default: ""
+  fail-on-warnings:
+    description: "'true' also fails the step when an invoice has warnings. By default only errors fail."
+    required: false
+    default: "false"
+  api-url:
+    description: "Base URL of the Valinvo API."
+    required: false
+    default: "https://valinvo.bmk-hub.com"
+
+outputs:
+  checked:
+    description: "Number of files validated."
+    value: ${{ steps.validate.outputs.checked }}
+  failed:
+    description: "Number of files that are invalid or could not be checked."
+    value: ${{ steps.validate.outputs.failed }}
+  report:
+    description: "Path of a JSON file with every result, error and warning."
+    value: ${{ steps.validate.outputs.report }}
+
+runs:
+  using: "composite"
+  steps:
+    - id: validate
+      shell: bash
+      # Inputs reach the script only as environment variables, never pasted into the shell command.
+      env:
+        INPUT_FILES: ${{ inputs.files }}
+        INPUT_ACCEPT_TERMS: ${{ inputs.accept-terms }}
+        INPUT_API_KEY: ${{ inputs.api-key }}
+        INPUT_FAIL_ON_WARNINGS: ${{ inputs.fail-on-warnings }}
+        INPUT_API_URL: ${{ inputs.api-url }}
+      run: |
+        PYTHON="$(command -v python3 || command -v python)"
+        "$PYTHON" "$GITHUB_ACTION_PATH/validate.py"

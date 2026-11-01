@@ -1,0 +1,58 @@
+name: Test
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  unit:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - run: python3 -m unittest discover -s tests -v
+
+  # Runs the action itself against the live API on every runner OS.
+  live:
+    needs: unit
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Valid examples pass
+        id: valid
+        uses: ./
+        with:
+          files: |
+            examples/valid/*.xml
+            examples/valid/*.pdf
+          accept-terms: "1.0"
+
+      - name: Outputs are set
+        shell: bash
+        run: |
+          test "${{ steps.valid.outputs.checked }}" = 4
+          test "${{ steps.valid.outputs.failed }}" = 0
+          test -f "${{ steps.valid.outputs.report }}"
+
+      - name: Invalid example fails
+        id: invalid
+        if: matrix.os == 'ubuntu-latest'
+        continue-on-error: true
+        uses: ./
+        with:
+          files: examples/invalid/*.xml
+          accept-terms: "1.0"
+
+      - name: The invalid example really failed
+        if: matrix.os == 'ubuntu-latest' && steps.invalid.outcome != 'failure'
+        shell: bash
+        run: echo "::error::The invalid example passed validation" && exit 1
